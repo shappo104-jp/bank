@@ -21,6 +21,7 @@ function App() {
   const [selectedPeriod, setSelectedPeriod] = useState('30days')
   const [selectedType, setSelectedType] = useState('all')
   const [showAddTransaction, setShowAddTransaction] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<Transaction | null>(null)
   const [customStartDate, setCustomStartDate] = useState(() => {
     const now = new Date()
     const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }))
@@ -180,6 +181,16 @@ function App() {
       amount: 0,
       isExpense: false
     })
+  }
+
+  const deleteTransaction = (id: number) => {
+    setTransactions(transactions.filter(tx => tx.id !== id))
+    setDeleteConfirm(null)
+  }
+
+  const handleContextMenu = (e: React.MouseEvent, tx: Transaction) => {
+    e.preventDefault()
+    setDeleteConfirm(tx)
   }
 
   const HomeScreen = () => (
@@ -398,7 +409,11 @@ function App() {
           2025年
         </div>
         {getFilteredTransactions().map((tx) => (
-          <div key={tx.id} className="px-4 py-4 border-b border-gray-100">
+          <div 
+            key={tx.id} 
+            className="px-4 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50"
+            onContextMenu={(e) => handleContextMenu(e, tx)}
+          >
             <div className="text-sm text-gray-600">
               {tx.date}　{tx.type}{tx.description ? `｜${tx.description}` : ''}
             </div>
@@ -407,6 +422,36 @@ function App() {
             </div>
           </div>
         ))}
+        
+        {deleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 mx-4 max-w-sm w-full shadow-xl">
+              <div className="text-lg font-medium mb-4 text-center">データを削除しますか？</div>
+              <div className="bg-gray-100 rounded-lg p-4 mb-4">
+                <div className="text-sm text-gray-600 mb-1">
+                  {deleteConfirm.date}　{deleteConfirm.type}{deleteConfirm.description ? `｜${deleteConfirm.description}` : ''}
+                </div>
+                <div className={`text-right text-lg font-medium ${deleteConfirm.amount < 0 ? 'text-red-500' : 'text-gray-900'}`}>
+                  {formatAmount(deleteConfirm.amount)}<span className="text-sm">円</span>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium"
+                >
+                  キャンセル
+                </button>
+                <button 
+                  onClick={() => deleteTransaction(deleteConfirm.id)}
+                  className="flex-1 py-3 bg-red-500 text-white rounded-lg font-medium"
+                >
+                  削除する
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="px-4 py-2 text-right text-xs text-gray-500">
           {currentTime} 現在
         </div>
