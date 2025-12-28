@@ -200,7 +200,7 @@ function App() {
   const handleTouchStart = (tx: Transaction) => {
     const timer = setTimeout(() => {
       setDeleteConfirm(tx)
-    }, 500)
+    }, 3000)
     setLongPressTimer(timer)
   }
 
