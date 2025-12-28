@@ -52,7 +52,8 @@ function App() {
     { id: 6, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
     { id: 7, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
   ])
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
+  const [swipedItemId, setSwipedItemId] = useState<number | null>(null)
+  const [touchStartX, setTouchStartX] = useState<number>(0)
 
   const accountInfo = {
     branchName: '柳橋支店',
@@ -190,6 +191,7 @@ function App() {
   const deleteTransaction = (id: number) => {
     setTransactions(transactions.filter(tx => tx.id !== id))
     setDeleteConfirm(null)
+    setSwipedItemId(null)
   }
 
   const handleContextMenu = (e: React.MouseEvent, tx: Transaction) => {
@@ -197,18 +199,21 @@ function App() {
     setDeleteConfirm(tx)
   }
 
-  const handleTouchStart = (tx: Transaction) => {
-    const timer = setTimeout(() => {
-      setDeleteConfirm(tx)
-    }, 3000)
-    setLongPressTimer(timer)
+  const handleSwipeTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX)
   }
 
-  const handleTouchEnd = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer)
-      setLongPressTimer(null)
+  const handleSwipeTouchMove = (e: React.TouchEvent, txId: number) => {
+    const touchCurrentX = e.touches[0].clientX
+    const diff = touchCurrentX - touchStartX
+    if (diff > 50) {
+      setSwipedItemId(txId)
+    } else if (diff < -50) {
+      setSwipedItemId(null)
     }
+  }
+
+  const handleSwipeTouchEnd = () => {
   }
 
   const HomeScreen = () => (
@@ -429,18 +434,28 @@ function App() {
         {getFilteredTransactions().map((tx) => (
           <div 
             key={tx.id} 
-            className="px-4 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 select-none"
-            onContextMenu={(e) => handleContextMenu(e, tx)}
-            onTouchStart={() => handleTouchStart(tx)}
-            onTouchEnd={handleTouchEnd}
-            onTouchMove={handleTouchEnd}
+            className="relative overflow-hidden border-b border-gray-100"
           >
-            <div className="text-sm text-gray-600">
-              {tx.date}　{tx.type}{tx.description ? `｜${tx.description}` : ''}
+            <div 
+              className={`px-4 py-4 cursor-pointer hover:bg-gray-50 select-none bg-white transition-transform duration-200 ${swipedItemId === tx.id ? 'translate-x-16' : 'translate-x-0'}`}
+              onContextMenu={(e) => handleContextMenu(e, tx)}
+              onTouchStart={(e) => handleSwipeTouchStart(e)}
+              onTouchMove={(e) => handleSwipeTouchMove(e, tx.id)}
+              onTouchEnd={handleSwipeTouchEnd}
+            >
+              <div className="text-sm text-gray-600">
+                {tx.date}　{tx.type}{tx.description ? `｜${tx.description}` : ''}
+              </div>
+              <div className={`text-right text-lg font-medium mt-1 ${tx.amount < 0 ? 'text-red-500' : 'text-gray-900'}`}>
+                {formatAmount(tx.amount)}<span className="text-sm">円</span>
+              </div>
             </div>
-            <div className={`text-right text-lg font-medium mt-1 ${tx.amount < 0 ? 'text-red-500' : 'text-gray-900'}`}>
-              {formatAmount(tx.amount)}<span className="text-sm">円</span>
-            </div>
+            <button
+              onClick={() => deleteTransaction(tx.id)}
+              className={`absolute left-0 top-0 bottom-0 w-16 bg-red-500 flex items-center justify-center text-white text-2xl font-bold transition-opacity duration-200 ${swipedItemId === tx.id ? 'opacity-100' : 'opacity-0'}`}
+            >
+              -
+            </button>
           </div>
         ))}
         
