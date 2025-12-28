@@ -48,7 +48,11 @@ function App() {
     { id: 2, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
     { id: 3, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
     { id: 4, date: '11/27', month: 11, day: 27, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 231338 },
+    { id: 5, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
+    { id: 6, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
+    { id: 7, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
   ])
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
 
   const accountInfo = {
     branchName: '柳橋支店',
@@ -191,6 +195,20 @@ function App() {
   const handleContextMenu = (e: React.MouseEvent, tx: Transaction) => {
     e.preventDefault()
     setDeleteConfirm(tx)
+  }
+
+  const handleTouchStart = (tx: Transaction) => {
+    const timer = setTimeout(() => {
+      setDeleteConfirm(tx)
+    }, 500)
+    setLongPressTimer(timer)
+  }
+
+  const handleTouchEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
+    }
   }
 
   const HomeScreen = () => (
@@ -411,8 +429,11 @@ function App() {
         {getFilteredTransactions().map((tx) => (
           <div 
             key={tx.id} 
-            className="px-4 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50"
+            className="px-4 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 select-none"
             onContextMenu={(e) => handleContextMenu(e, tx)}
+            onTouchStart={() => handleTouchStart(tx)}
+            onTouchEnd={handleTouchEnd}
+            onTouchMove={handleTouchEnd}
           >
             <div className="text-sm text-gray-600">
               {tx.date}　{tx.type}{tx.description ? `｜${tx.description}` : ''}
