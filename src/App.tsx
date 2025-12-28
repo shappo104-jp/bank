@@ -399,15 +399,11 @@ function App() {
         </div>
         {getFilteredTransactions().map((tx) => (
           <div key={tx.id} className="px-4 py-4 border-b border-gray-100">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-sm text-gray-600">
-                  {tx.date} {tx.type}{tx.description ? `｜${tx.description}` : ''}
-                </div>
-              </div>
-              <div className={`text-lg font-medium ${tx.amount < 0 ? 'text-red-500' : 'text-gray-900'}`}>
-                {formatAmount(tx.amount)}<span className="text-sm">円</span>
-              </div>
+            <div className="text-sm text-gray-600">
+              {tx.date}　{tx.type}{tx.description ? `｜${tx.description}` : ''}
+            </div>
+            <div className={`text-right text-lg font-medium mt-1 ${tx.amount < 0 ? 'text-red-500' : 'text-gray-900'}`}>
+              {formatAmount(tx.amount)}<span className="text-sm">円</span>
             </div>
           </div>
         ))}
