@@ -48,7 +48,7 @@ function App() {
     { id: 2, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
     { id: 3, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
     { id: 4, date: '11/27', month: 11, day: 27, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 231338 },
-    { id: 5, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
+    { id: 5, date: '10/31', month: 10, day: 31, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
     { id: 6, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
     { id: 7, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
   ])
