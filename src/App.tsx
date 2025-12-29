@@ -43,6 +43,7 @@ function App() {
     isExpense: false
   })
   
+  const baseBalance = 448772
   const [transactions, setTransactions] = useState<Transaction[]>([
     { id: 1, date: '12/25', month: 12, day: 25, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 442507 },
     { id: 2, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
@@ -54,13 +55,22 @@ function App() {
   ])
   const [swipedItemId, setSwipedItemId] = useState<number | null>(null)
   const [touchStartX, setTouchStartX] = useState<number>(0)
+  const [scheduledTransactionAdded, setScheduledTransactionAdded] = useState(false)
+
+  const calculateBalance = () => {
+    const newTransactions = transactions.filter(tx => tx.month === 12 && tx.day >= 29)
+    const adjustment = newTransactions.reduce((sum, tx) => sum + tx.amount, 0)
+    return baseBalance + adjustment
+  }
+
+  const currentBalance = calculateBalance()
 
   const accountInfo = {
     branchName: '柳橋支店',
     branchCode: '224',
     accountNumber: '0392891',
     accountType: '普通',
-    balance: 448772
+    balance: currentBalance
   }
 
   useEffect(() => {
@@ -77,6 +87,41 @@ function App() {
     const interval = setInterval(updateTime, 1000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    const checkScheduledTransaction = () => {
+      if (scheduledTransactionAdded) return
+      
+      const now = new Date()
+      const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }))
+      const year = japanTime.getFullYear()
+      const month = japanTime.getMonth() + 1
+      const day = japanTime.getDate()
+      const hours = japanTime.getHours()
+      const minutes = japanTime.getMinutes()
+      
+      if (year === 2025 && month === 12 && day === 29 && hours >= 18 && minutes >= 30) {
+        const scheduledTx: Transaction = {
+          id: Date.now(),
+          date: '12/29',
+          month: 12,
+          day: 29,
+          type: 'カード',
+          description: '',
+          amount: -434000
+        }
+        setTransactions(prev => [scheduledTx, ...prev].sort((a, b) => {
+          if (a.month !== b.month) return b.month - a.month
+          return b.day - a.day
+        }))
+        setScheduledTransactionAdded(true)
+      }
+    }
+    
+    checkScheduledTransaction()
+    const interval = setInterval(checkScheduledTransaction, 60000)
+    return () => clearInterval(interval)
+  }, [scheduledTransactionAdded])
 
   const getDateRange = () => {
     if (selectedPeriod === 'custom') {
