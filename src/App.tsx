@@ -44,15 +44,33 @@ function App() {
   })
   
   const baseBalance = 448772
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    { id: 1, date: '12/25', month: 12, day: 25, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 442507 },
-    { id: 2, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
-    { id: 3, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
-    { id: 4, date: '11/27', month: 11, day: 27, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 231338 },
-    { id: 5, date: '10/31', month: 10, day: 31, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
-    { id: 6, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
-    { id: 7, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
-  ])
+  
+  const getTypePriority = (type: string): number => {
+    if (type === '電話') return 0
+    if (type === 'カード') return 1
+    if (type === '振込2' || type === '振込') return 2
+    return 3
+  }
+  
+  const sortTransactions = (txList: Transaction[]): Transaction[] => {
+    return [...txList].sort((a, b) => {
+      if (a.month !== b.month) return b.month - a.month
+      if (a.day !== b.day) return b.day - a.day
+      return getTypePriority(a.type) - getTypePriority(b.type)
+    })
+  }
+  
+  const [transactions, setTransactions] = useState<Transaction[]>(
+    sortTransactions([
+      { id: 1, date: '12/25', month: 12, day: 25, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 442507 },
+      { id: 2, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
+      { id: 3, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
+      { id: 4, date: '11/27', month: 11, day: 27, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 231338 },
+      { id: 5, date: '10/31', month: 10, day: 31, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
+      { id: 6, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
+      { id: 7, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
+    ])
+  )
   const [swipedItemId, setSwipedItemId] = useState<number | null>(null)
   const [touchStartX, setTouchStartX] = useState<number>(0)
   const [scheduledTransactionAdded, setScheduledTransactionAdded] = useState(false)
@@ -110,10 +128,7 @@ function App() {
           description: '',
           amount: -434000
         }
-        setTransactions(prev => [scheduledTx, ...prev].sort((a, b) => {
-          if (a.month !== b.month) return b.month - a.month
-          return b.day - a.day
-        }))
+        setTransactions(prev => sortTransactions([scheduledTx, ...prev]))
         setScheduledTransactionAdded(true)
       }
     }
@@ -218,10 +233,7 @@ function App() {
       description: newTransaction.description,
       amount: amount
     }
-    setTransactions([newTx, ...transactions].sort((a, b) => {
-      if (a.month !== b.month) return b.month - a.month
-      return b.day - a.day
-    }))
+    setTransactions(sortTransactions([newTx, ...transactions]))
     setShowAddTransaction(false)
     setNewTransaction({
       month: 12,
