@@ -62,6 +62,7 @@ function App() {
   
   const [transactions, setTransactions] = useState<Transaction[]>(
     sortTransactions([
+      { id: 8, date: '12/29', month: 12, day: 29, type: 'カード', description: '', amount: -434000 },
       { id: 1, date: '12/25', month: 12, day: 25, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 442507 },
       { id: 2, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
       { id: 3, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
