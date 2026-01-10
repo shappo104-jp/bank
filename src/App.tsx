@@ -88,7 +88,6 @@ function App() {
   })
   const [swipedItemId, setSwipedItemId] = useState<number | null>(null)
   const [touchStartX, setTouchStartX] = useState<number>(0)
-  const [scheduledTransactionAdded, setScheduledTransactionAdded] = useState(false)
 
   const calculateBalance = () => {
     const newTransactions = transactions.filter(tx => 
@@ -126,38 +125,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem('bankTransactions', JSON.stringify(transactions))
   }, [transactions])
-
-  useEffect(() => {
-    const checkScheduledTransaction = () => {
-      if (scheduledTransactionAdded) return
-      
-      const now = new Date()
-      const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }))
-      const year = japanTime.getFullYear()
-      const month = japanTime.getMonth() + 1
-      const day = japanTime.getDate()
-      const hours = japanTime.getHours()
-      const minutes = japanTime.getMinutes()
-      
-      if (year === 2025 && month === 12 && day === 29 && hours >= 18 && minutes >= 30) {
-        const scheduledTx: Transaction = {
-          id: Date.now(),
-          date: '12/29',
-          month: 12,
-          day: 29,
-          type: 'カード',
-          description: '',
-          amount: -434000
-        }
-        setTransactions(prev => sortTransactions([scheduledTx, ...prev]))
-        setScheduledTransactionAdded(true)
-      }
-    }
-    
-    checkScheduledTransaction()
-    const interval = setInterval(checkScheduledTransaction, 60000)
-    return () => clearInterval(interval)
-  }, [scheduledTransactionAdded])
 
   const getDateRange = () => {
     if (selectedPeriod === 'custom') {
