@@ -74,18 +74,22 @@ function App() {
     { id: 6, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
     { id: 7, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
   ]
+  const defaultIds = new Set(defaultTransactions.map(tx => tx.id))
   
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('bankTransactions')
+  const [userAddedTransactions, setUserAddedTransactions] = useState<Transaction[]>(() => {
+    const saved = localStorage.getItem('bankUserTransactions')
     if (saved) {
       try {
-        return sortTransactions(JSON.parse(saved))
+        return JSON.parse(saved)
       } catch {
-        return sortTransactions(defaultTransactions)
+        return []
       }
     }
-    return sortTransactions(defaultTransactions)
+    return []
   })
+  
+  const transactions = sortTransactions([...defaultTransactions, ...userAddedTransactions])
+  
   const [swipedItemId, setSwipedItemId] = useState<number | null>(null)
   const [touchStartX, setTouchStartX] = useState<number>(0)
 
@@ -123,8 +127,8 @@ function App() {
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('bankTransactions', JSON.stringify(transactions))
-  }, [transactions])
+    localStorage.setItem('bankUserTransactions', JSON.stringify(userAddedTransactions))
+  }, [userAddedTransactions])
 
   const getDateRange = () => {
     if (selectedPeriod === 'custom') {
@@ -221,7 +225,7 @@ function App() {
       description: newTransaction.description,
       amount: amount
     }
-    setTransactions(sortTransactions([newTx, ...transactions]))
+    setUserAddedTransactions([...userAddedTransactions, newTx])
     setShowAddTransaction(false)
     setNewTransaction({
       month: 12,
@@ -234,7 +238,12 @@ function App() {
   }
 
   const deleteTransaction = (id: number) => {
-    setTransactions(transactions.filter(tx => tx.id !== id))
+    if (defaultIds.has(id)) {
+      setDeleteConfirm(null)
+      setSwipedItemId(null)
+      return
+    }
+    setUserAddedTransactions(userAddedTransactions.filter(tx => tx.id !== id))
     setDeleteConfirm(null)
     setSwipedItemId(null)
   }
