@@ -74,21 +74,20 @@ function App() {
     { id: 6, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
     { id: 7, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
   ]
-  const defaultIds = new Set(defaultTransactions.map(tx => tx.id))
   
-  const [userAddedTransactions, setUserAddedTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('bankUserTransactions')
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const savedNew = localStorage.getItem('bankUserTransactions')
+    const savedOld = localStorage.getItem('bankTransactions')
+    const saved = savedNew || savedOld
     if (saved) {
       try {
-        return JSON.parse(saved)
+        return sortTransactions(JSON.parse(saved))
       } catch {
-        return []
+        return sortTransactions(defaultTransactions)
       }
     }
-    return []
+    return sortTransactions(defaultTransactions)
   })
-  
-  const transactions = sortTransactions([...defaultTransactions, ...userAddedTransactions])
   
   const [swipedItemId, setSwipedItemId] = useState<number | null>(null)
   const [touchStartX, setTouchStartX] = useState<number>(0)
@@ -127,8 +126,8 @@ function App() {
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('bankUserTransactions', JSON.stringify(userAddedTransactions))
-  }, [userAddedTransactions])
+    localStorage.setItem('bankTransactions', JSON.stringify(transactions))
+  }, [transactions])
 
   const getDateRange = () => {
     if (selectedPeriod === 'custom') {
@@ -159,10 +158,22 @@ function App() {
     return `${formatDate(startDate)} - ${formatDate(endDate)}`
   }
 
-  const getFilteredTransactions = () => {
+  const getTxDate = (tx: Transaction) => {
     const now = new Date()
     const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }))
     const currentYear = japanTime.getFullYear()
+    const currentMonth = japanTime.getMonth() + 1
+    
+    let txYear = currentYear
+    if (tx.month > currentMonth + 1) {
+      txYear = currentYear - 1
+    }
+    return new Date(txYear, tx.month - 1, tx.day)
+  }
+
+  const getFilteredTransactions = () => {
+    const now = new Date()
+    const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }))
     let endDate: Date
     let startDate: Date
     
@@ -189,7 +200,7 @@ function App() {
     }
 
     return transactions.filter(tx => {
-      const txDate = new Date(currentYear, tx.month - 1, tx.day)
+      const txDate = getTxDate(tx)
       const inDateRange = txDate >= startDate && txDate <= endDate
       
       if (selectedType === 'all') return inDateRange
@@ -225,7 +236,7 @@ function App() {
       description: newTransaction.description,
       amount: amount
     }
-    setUserAddedTransactions([...userAddedTransactions, newTx])
+    setTransactions(sortTransactions([...transactions, newTx]))
     setShowAddTransaction(false)
     setNewTransaction({
       month: 12,
@@ -238,12 +249,7 @@ function App() {
   }
 
   const deleteTransaction = (id: number) => {
-    if (defaultIds.has(id)) {
-      setDeleteConfirm(null)
-      setSwipedItemId(null)
-      return
-    }
-    setUserAddedTransactions(userAddedTransactions.filter(tx => tx.id !== id))
+    setTransactions(transactions.filter(tx => tx.id !== id))
     setDeleteConfirm(null)
     setSwipedItemId(null)
   }
