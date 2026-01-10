@@ -54,30 +54,46 @@ function App() {
   
   const sortTransactions = (txList: Transaction[]): Transaction[] => {
     return [...txList].sort((a, b) => {
+      const aIsNewYear = a.month <= 2
+      const bIsNewYear = b.month <= 2
+      if (aIsNewYear !== bIsNewYear) return aIsNewYear ? -1 : 1
       if (a.month !== b.month) return b.month - a.month
       if (a.day !== b.day) return b.day - a.day
       return getTypePriority(a.type) - getTypePriority(b.type)
     })
   }
   
-  const [transactions, setTransactions] = useState<Transaction[]>(
-    sortTransactions([
-      { id: 8, date: '12/29', month: 12, day: 29, type: 'カード', description: '', amount: -434000 },
-      { id: 1, date: '12/25', month: 12, day: 25, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 442507 },
-      { id: 2, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
-      { id: 3, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
-      { id: 4, date: '11/27', month: 11, day: 27, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 231338 },
-      { id: 5, date: '10/31', month: 10, day: 31, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
-      { id: 6, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
-      { id: 7, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
-    ])
-  )
+  const defaultTransactions: Transaction[] = [
+    { id: 9, date: '1/05', month: 1, day: 5, type: '電話', description: 'ドコモケイタイ', amount: -6692 },
+    { id: 8, date: '12/29', month: 12, day: 29, type: 'カード', description: '', amount: -434000 },
+    { id: 1, date: '12/25', month: 12, day: 25, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 442507 },
+    { id: 2, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
+    { id: 3, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
+    { id: 4, date: '11/27', month: 11, day: 27, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 231338 },
+    { id: 5, date: '10/31', month: 10, day: 31, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
+    { id: 6, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
+    { id: 7, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
+  ]
+  
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const saved = localStorage.getItem('bankTransactions')
+    if (saved) {
+      try {
+        return sortTransactions(JSON.parse(saved))
+      } catch {
+        return sortTransactions(defaultTransactions)
+      }
+    }
+    return sortTransactions(defaultTransactions)
+  })
   const [swipedItemId, setSwipedItemId] = useState<number | null>(null)
   const [touchStartX, setTouchStartX] = useState<number>(0)
   const [scheduledTransactionAdded, setScheduledTransactionAdded] = useState(false)
 
   const calculateBalance = () => {
-    const newTransactions = transactions.filter(tx => tx.month === 12 && tx.day >= 29)
+    const newTransactions = transactions.filter(tx => 
+      tx.month === 1 || (tx.month === 12 && tx.day >= 29)
+    )
     const adjustment = newTransactions.reduce((sum, tx) => sum + tx.amount, 0)
     return baseBalance + adjustment
   }
@@ -106,6 +122,10 @@ function App() {
     const interval = setInterval(updateTime, 1000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem('bankTransactions', JSON.stringify(transactions))
+  }, [transactions])
 
   useEffect(() => {
     const checkScheduledTransaction = () => {
