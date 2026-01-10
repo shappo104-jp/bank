@@ -488,36 +488,46 @@ function App() {
       </div>
 
       <div className="flex-1 overflow-auto bg-white mx-4 mt-2 rounded-t-lg">
-        <div className="px-4 py-2 bg-gray-100 text-sm font-medium text-gray-700">
-          2025年
-        </div>
-        {getFilteredTransactions().map((tx) => (
-          <div 
-            key={tx.id} 
-            className="relative overflow-hidden border-b border-gray-100"
-          >
-            <div 
-              className={`px-4 py-4 cursor-pointer hover:bg-gray-50 select-none bg-white transition-transform duration-200 ${swipedItemId === tx.id ? 'translate-x-16' : 'translate-x-0'}`}
-              onContextMenu={(e) => handleContextMenu(e, tx)}
-              onTouchStart={(e) => handleSwipeTouchStart(e)}
-              onTouchMove={(e) => handleSwipeTouchMove(e, tx.id)}
-              onTouchEnd={handleSwipeTouchEnd}
-            >
-              <div className="text-sm text-gray-600">
-                {tx.date}　{tx.type}{tx.description ? `｜${tx.description}` : ''}
+        {(() => {
+          const filteredTx = getFilteredTransactions()
+          let lastYear: number | null = null
+          return filteredTx.map((tx) => {
+            const txYear = getTxDate(tx).getFullYear()
+            const showYearHeader = txYear !== lastYear
+            lastYear = txYear
+            return (
+              <div key={tx.id}>
+                {showYearHeader && (
+                  <div className="px-4 py-2 bg-gray-100 text-sm font-medium text-gray-700">
+                    {txYear}年
+                  </div>
+                )}
+                <div className="relative overflow-hidden border-b border-gray-100">
+                  <div 
+                    className={`px-4 py-4 cursor-pointer hover:bg-gray-50 select-none bg-white transition-transform duration-200 ${swipedItemId === tx.id ? 'translate-x-16' : 'translate-x-0'}`}
+                    onContextMenu={(e) => handleContextMenu(e, tx)}
+                    onTouchStart={(e) => handleSwipeTouchStart(e)}
+                    onTouchMove={(e) => handleSwipeTouchMove(e, tx.id)}
+                    onTouchEnd={handleSwipeTouchEnd}
+                  >
+                    <div className="text-sm text-gray-600">
+                      {tx.date.replace(/^(\d+)\//, (_, m) => m.padStart(2, '0') + '/')}　{tx.type}{tx.description ? `｜${tx.description}` : ''}
+                    </div>
+                    <div className={`text-right text-lg font-medium mt-1 ${tx.amount < 0 ? 'text-red-500' : 'text-gray-900'}`}>
+                      {formatAmount(tx.amount)}<span className="text-sm">円</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => deleteTransaction(tx.id)}
+                    className={`absolute left-0 top-0 bottom-0 w-16 bg-red-500 flex items-center justify-center text-white text-2xl font-bold transition-opacity duration-200 ${swipedItemId === tx.id ? 'opacity-100' : 'opacity-0'}`}
+                  >
+                    -
+                  </button>
+                </div>
               </div>
-              <div className={`text-right text-lg font-medium mt-1 ${tx.amount < 0 ? 'text-red-500' : 'text-gray-900'}`}>
-                {formatAmount(tx.amount)}<span className="text-sm">円</span>
-              </div>
-            </div>
-            <button
-              onClick={() => deleteTransaction(tx.id)}
-              className={`absolute left-0 top-0 bottom-0 w-16 bg-red-500 flex items-center justify-center text-white text-2xl font-bold transition-opacity duration-200 ${swipedItemId === tx.id ? 'opacity-100' : 'opacity-0'}`}
-            >
-              -
-            </button>
-          </div>
-        ))}
+            )
+          })
+        })()}
         
         {deleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
