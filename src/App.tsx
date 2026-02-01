@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import './App.css'
 import { ChevronLeft, ChevronRight, ChevronDown, HelpCircle, Bell, LogOut, Home, Building2, ArrowLeftRight, Settings, User, Search, X, Plus } from 'lucide-react'
 
@@ -13,6 +13,8 @@ interface Transaction {
   description: string
   amount: number
 }
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
@@ -43,7 +45,11 @@ function App() {
     isExpense: false
   })
   
-  const baseBalance = 448772
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [currentBalance, setCurrentBalance] = useState<number>(0)
+  
+  const [swipedItemId, setSwipedItemId] = useState<number | null>(null)
+  const [touchStartX, setTouchStartX] = useState<number>(0)
   
   const getTypePriority = (type: string): number => {
     if (type === '電話') return 0
@@ -62,45 +68,35 @@ function App() {
       return getTypePriority(a.type) - getTypePriority(b.type)
     })
   }
-  
-  const defaultTransactions: Transaction[] = [
-    { id: 9, date: '1/05', month: 1, day: 5, type: '電話', description: 'ドコモケイタイ', amount: -6692 },
-    { id: 8, date: '12/29', month: 12, day: 29, type: 'カード', description: '', amount: -434000 },
-    { id: 1, date: '12/25', month: 12, day: 25, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 442507 },
-    { id: 2, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
-    { id: 3, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
-    { id: 4, date: '11/27', month: 11, day: 27, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 231338 },
-    { id: 5, date: '10/31', month: 10, day: 31, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
-    { id: 6, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
-    { id: 7, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
-  ]
-  
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const savedNew = localStorage.getItem('bankUserTransactions')
-    const savedOld = localStorage.getItem('bankTransactions')
-    const saved = savedNew || savedOld
-    if (saved) {
-      try {
-        return sortTransactions(JSON.parse(saved))
-      } catch {
-        return sortTransactions(defaultTransactions)
+
+  const fetchTransactions = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/transactions`)
+      if (response.ok) {
+        const data = await response.json()
+        setTransactions(sortTransactions(data))
       }
+    } catch (error) {
+      console.error('Failed to fetch transactions:', error)
     }
-    return sortTransactions(defaultTransactions)
-  })
-  
-  const [swipedItemId, setSwipedItemId] = useState<number | null>(null)
-  const [touchStartX, setTouchStartX] = useState<number>(0)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const calculateBalance = () => {
-    const newTransactions = transactions.filter(tx => 
-      tx.month === 1 || (tx.month === 12 && tx.day >= 29)
-    )
-    const adjustment = newTransactions.reduce((sum, tx) => sum + tx.amount, 0)
-    return baseBalance + adjustment
-  }
+  const fetchBalance = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/balance`)
+      if (response.ok) {
+        const data = await response.json()
+        setCurrentBalance(data.balance)
+      }
+    } catch (error) {
+      console.error('Failed to fetch balance:', error)
+    }
+  }, [])
 
-  const currentBalance = calculateBalance()
+  const fetchData = useCallback(async () => {
+    await Promise.all([fetchTransactions(), fetchBalance()])
+  }, [fetchTransactions, fetchBalance])
 
   const accountInfo = {
     branchName: '柳橋支店',
@@ -109,6 +105,10 @@ function App() {
     accountType: '普通',
     balance: currentBalance
   }
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   useEffect(() => {
     const updateTime = () => {
@@ -124,10 +124,6 @@ function App() {
     const interval = setInterval(updateTime, 1000)
     return () => clearInterval(interval)
   }, [])
-
-  useEffect(() => {
-    localStorage.setItem('bankTransactions', JSON.stringify(transactions))
-  }, [transactions])
 
   const getDateRange = () => {
     if (selectedPeriod === 'custom') {
@@ -225,10 +221,9 @@ function App() {
     return formatted
   }
 
-  const addTransaction = () => {
+  const addTransaction = async () => {
     const amount = newTransaction.isExpense ? -Math.abs(newTransaction.amount) : Math.abs(newTransaction.amount)
-    const newTx: Transaction = {
-      id: Date.now(),
+    const newTx = {
       date: `${newTransaction.month}/${newTransaction.day.toString().padStart(2, '0')}`,
       month: newTransaction.month,
       day: newTransaction.day,
@@ -236,22 +231,47 @@ function App() {
       description: newTransaction.description,
       amount: amount
     }
-    setTransactions(sortTransactions([...transactions, newTx]))
-    setShowAddTransaction(false)
-    setNewTransaction({
-      month: 12,
-      day: 1,
-      type: '振込',
-      description: '',
-      amount: 0,
-      isExpense: false
-    })
+    
+    try {
+      const response = await fetch(`${API_URL}/api/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTx),
+      })
+      
+      if (response.ok) {
+        await fetchData()
+        setShowAddTransaction(false)
+        setNewTransaction({
+          month: 12,
+          day: 1,
+          type: '振込',
+          description: '',
+          amount: 0,
+          isExpense: false
+        })
+      }
+    } catch (error) {
+      console.error('Failed to add transaction:', error)
+    }
   }
 
-  const deleteTransaction = (id: number) => {
-    setTransactions(transactions.filter(tx => tx.id !== id))
-    setDeleteConfirm(null)
-    setSwipedItemId(null)
+  const deleteTransaction = async (id: number) => {
+    try {
+      const response = await fetch(`${API_URL}/api/transactions/${id}`, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        await fetchData()
+        setDeleteConfirm(null)
+        setSwipedItemId(null)
+      }
+    } catch (error) {
+      console.error('Failed to delete transaction:', error)
+    }
   }
 
   const handleContextMenu = (e: React.MouseEvent, tx: Transaction) => {
@@ -511,7 +531,7 @@ function App() {
                     onTouchEnd={handleSwipeTouchEnd}
                   >
                     <div className="text-sm text-gray-600">
-                      {tx.date.replace(/^(\d+)\//, (_, m) => m.padStart(2, '0') + '/')}　{tx.type}{tx.description ? `｜${tx.description}` : ''}
+                      {tx.date.replace(/^(\d+)\//, (_, m) => m.padStart(2, '0') + '/')}{'\u3000'}{tx.type}{tx.description ? `｜${tx.description}` : ''}
                     </div>
                     <div className={`text-right text-lg font-medium mt-1 ${tx.amount < 0 ? 'text-red-500' : 'text-gray-900'}`}>
                       {formatAmount(tx.amount)}<span className="text-sm">円</span>
@@ -535,7 +555,7 @@ function App() {
               <div className="text-lg font-medium mb-4 text-center">データを削除しますか？</div>
               <div className="bg-gray-100 rounded-lg p-4 mb-4">
                 <div className="text-sm text-gray-600 mb-1">
-                  {deleteConfirm.date}　{deleteConfirm.type}{deleteConfirm.description ? `｜${deleteConfirm.description}` : ''}
+                  {deleteConfirm.date}{'\u3000'}{deleteConfirm.type}{deleteConfirm.description ? `｜${deleteConfirm.description}` : ''}
                 </div>
                 <div className={`text-right text-lg font-medium ${deleteConfirm.amount < 0 ? 'text-red-500' : 'text-gray-900'}`}>
                   {formatAmount(deleteConfirm.amount)}<span className="text-sm">円</span>
@@ -607,7 +627,7 @@ function App() {
               </div>
               <div>
                 <div className="text-sm font-medium">{accountInfo.branchName}</div>
-                <div className="text-xs text-gray-500">{accountInfo.accountType}　{accountInfo.accountNumber}</div>
+                <div className="text-xs text-gray-500">{accountInfo.accountType}{'\u3000'}{accountInfo.accountNumber}</div>
               </div>
             </div>
           </div>
