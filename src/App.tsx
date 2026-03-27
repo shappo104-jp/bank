@@ -14,7 +14,13 @@ interface Transaction {
   amount: number
 }
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const getApiUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL
+  if (envUrl === undefined) return 'http://localhost:8000'
+  if (envUrl === '') return window.location.origin
+  return envUrl
+}
+const API_URL = getApiUrl()
 
 const DEFAULT_TRANSACTIONS: Transaction[] = [
   { id: 1, date: '1/05', month: 1, day: 5, type: '電話', description: 'ドコモケイタイ', amount: -6692 },
