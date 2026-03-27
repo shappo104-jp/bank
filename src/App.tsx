@@ -98,8 +98,8 @@ function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [currentBalance, setCurrentBalance] = useState<number>(0)
   
-  const [swipedItemId, setSwipedItemId] = useState<number | null>(null)
-  const [touchStartX, setTouchStartX] = useState<number>(0)
+  const [longPressTimer, setLongPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const [longPressProgress, setLongPressProgress] = useState<{id: number, startTime: number} | null>(null)
   
   const getTypePriority = (type: string): number => {
     if (type === '電話') return 0
@@ -361,7 +361,6 @@ function App() {
         if (response.ok) {
           await fetchData()
           setDeleteConfirm(null)
-          setSwipedItemId(null)
           return
         }
       } catch (error) {
@@ -375,29 +374,23 @@ function App() {
     setTransactions(sortTransactions(updatedTx))
     setCurrentBalance(calcBalance(updatedTx))
     setDeleteConfirm(null)
-    setSwipedItemId(null)
   }
 
-  const handleContextMenu = (e: React.MouseEvent, tx: Transaction) => {
-    e.preventDefault()
-    setDeleteConfirm(tx)
+  const handleLongPressStart = (tx: Transaction) => {
+    setLongPressProgress({ id: tx.id, startTime: Date.now() })
+    const timer = setTimeout(() => {
+      setDeleteConfirm(tx)
+      setLongPressProgress(null)
+    }, 10000)
+    setLongPressTimer(timer)
   }
 
-  const handleSwipeTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.touches[0].clientX)
-  }
-
-  const handleSwipeTouchMove = (e: React.TouchEvent, txId: number) => {
-    const touchCurrentX = e.touches[0].clientX
-    const diff = touchCurrentX - touchStartX
-    if (diff > 50) {
-      setSwipedItemId(txId)
-    } else if (diff < -50) {
-      setSwipedItemId(null)
+  const handleLongPressEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
     }
-  }
-
-  const handleSwipeTouchEnd = () => {
+    setLongPressProgress(null)
   }
 
   const HomeScreen = () => (
@@ -628,11 +621,14 @@ function App() {
                 )}
                 <div className="relative overflow-hidden border-b border-gray-100">
                   <div 
-                    className={`px-4 py-4 cursor-pointer hover:bg-gray-50 select-none bg-white transition-transform duration-200 ${swipedItemId === tx.id ? 'translate-x-16' : 'translate-x-0'}`}
-                    onContextMenu={(e) => handleContextMenu(e, tx)}
-                    onTouchStart={(e) => handleSwipeTouchStart(e)}
-                    onTouchMove={(e) => handleSwipeTouchMove(e, tx.id)}
-                    onTouchEnd={handleSwipeTouchEnd}
+                    className="px-4 py-4 cursor-pointer hover:bg-gray-50 select-none bg-white"
+                    onTouchStart={() => handleLongPressStart(tx)}
+                    onTouchEnd={handleLongPressEnd}
+                    onTouchCancel={handleLongPressEnd}
+                    onMouseDown={() => handleLongPressStart(tx)}
+                    onMouseUp={handleLongPressEnd}
+                    onMouseLeave={handleLongPressEnd}
+                    onContextMenu={(e) => e.preventDefault()}
                   >
                     <div className="text-sm text-gray-600">
                       {tx.date.replace(/^(\d+)\//, (_, m) => m.padStart(2, '0') + '/')}{'\u3000'}{tx.type}{tx.description ? `｜${tx.description}` : ''}
@@ -640,13 +636,12 @@ function App() {
                     <div className={`text-right text-lg font-medium mt-1 ${tx.amount < 0 ? 'text-red-500' : 'text-gray-900'}`}>
                       {formatAmount(tx.amount)}<span className="text-sm">円</span>
                     </div>
+                    {longPressProgress && longPressProgress.id === tx.id && (
+                      <div className="mt-1 w-full bg-gray-200 rounded-full h-1.5">
+                        <div className="bg-red-500 h-1.5 rounded-full transition-all duration-[10000ms] ease-linear w-full" style={{animation: 'progressBar 10s linear forwards'}} />
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => deleteTransaction(tx.id)}
-                    className={`absolute left-0 top-0 bottom-0 w-16 bg-red-500 flex items-center justify-center text-white text-2xl font-bold transition-opacity duration-200 ${swipedItemId === tx.id ? 'opacity-100' : 'opacity-0'}`}
-                  >
-                    -
-                  </button>
                 </div>
               </div>
             )
