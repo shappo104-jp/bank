@@ -152,7 +152,7 @@ async def get_balance():
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT SUM(amount) as total FROM transactions WHERE month = 1 OR month = 2 OR (month = 12 AND day >= 29)"
+            "SELECT SUM(amount) as total FROM transactions"
         )
         row = cursor.fetchone()
         adjustment = row["total"] if row["total"] is not None else 0

@@ -57,12 +57,7 @@ const saveLocalTransactions = (txList: Transaction[]) => {
 }
 
 const calcBalance = (txList: Transaction[]): number => {
-  const adjustment = txList.reduce((sum, tx) => {
-    if (tx.month === 1 || tx.month === 2 || (tx.month === 12 && tx.day >= 29)) {
-      return sum + tx.amount
-    }
-    return sum
-  }, 0)
+  const adjustment = txList.reduce((sum, tx) => sum + tx.amount, 0)
   return BASE_BALANCE + adjustment
 }
 
