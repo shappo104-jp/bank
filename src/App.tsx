@@ -35,7 +35,36 @@ const DEFAULT_TRANSACTIONS: Transaction[] = [
 ]
 
 const BASE_BALANCE = 448772
-const DEFAULT_ADJUSTMENT = -440692
+
+const STORAGE_KEY = 'bank_transactions'
+
+const loadLocalTransactions = (): Transaction[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch (e) {
+    console.error('Failed to load from localStorage:', e)
+  }
+  return DEFAULT_TRANSACTIONS
+}
+
+const saveLocalTransactions = (txList: Transaction[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(txList))
+  } catch (e) {
+    console.error('Failed to save to localStorage:', e)
+  }
+}
+
+const calcBalance = (txList: Transaction[]): number => {
+  const adjustment = txList.reduce((sum, tx) => {
+    if (tx.month === 1 || tx.month === 2 || (tx.month === 12 && tx.day >= 29)) {
+      return sum + tx.amount
+    }
+    return sum
+  }, 0)
+  return BASE_BALANCE + adjustment
+}
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
@@ -101,6 +130,8 @@ function App() {
     })
   }
 
+  const [useLocalStorage, setUseLocalStorage] = useState(false)
+
   const fetchTransactions = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/transactions`)
@@ -110,9 +141,11 @@ function App() {
         return
       }
     } catch (error) {
-      console.error('Failed to fetch transactions, using defaults:', error)
+      console.error('Failed to fetch transactions, using localStorage:', error)
     }
-    setTransactions(sortTransactions(DEFAULT_TRANSACTIONS))
+    setUseLocalStorage(true)
+    const localTx = loadLocalTransactions()
+    setTransactions(sortTransactions(localTx))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -125,9 +158,10 @@ function App() {
         return
       }
     } catch (error) {
-      console.error('Failed to fetch balance, using defaults:', error)
+      console.error('Failed to fetch balance, using localStorage:', error)
     }
-    setCurrentBalance(BASE_BALANCE + DEFAULT_ADJUSTMENT)
+    const localTx = loadLocalTransactions()
+    setCurrentBalance(calcBalance(localTx))
   }, [])
 
   const fetchData = useCallback(async () => {
@@ -271,46 +305,77 @@ function App() {
       amount: amount
     }
     
-    try {
-      const response = await fetch(`${API_URL}/api/transactions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newTx),
-      })
-      
-      if (response.ok) {
-        await fetchData()
-        setShowAddTransaction(false)
-        setNewTransaction({
-          month: 12,
-          day: 1,
-          type: '振込',
-          description: '',
-          amount: 0,
-          isExpense: false
+    if (!useLocalStorage) {
+      try {
+        const response = await fetch(`${API_URL}/api/transactions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newTx),
         })
+        
+        if (response.ok) {
+          await fetchData()
+          setShowAddTransaction(false)
+          setNewTransaction({
+            month: 12,
+            day: 1,
+            type: '振込',
+            description: '',
+            amount: 0,
+            isExpense: false
+          })
+          return
+        }
+      } catch (error) {
+        console.error('Failed to add transaction via API, using localStorage:', error)
       }
-    } catch (error) {
-      console.error('Failed to add transaction:', error)
     }
+    
+    const localTx = loadLocalTransactions()
+    const maxId = localTx.reduce((max, tx) => Math.max(max, tx.id), 0)
+    const fullTx: Transaction = { ...newTx, id: maxId + 1 }
+    const updatedTx = [...localTx, fullTx]
+    saveLocalTransactions(updatedTx)
+    setTransactions(sortTransactions(updatedTx))
+    setCurrentBalance(calcBalance(updatedTx))
+    setShowAddTransaction(false)
+    setNewTransaction({
+      month: 12,
+      day: 1,
+      type: '振込',
+      description: '',
+      amount: 0,
+      isExpense: false
+    })
   }
 
   const deleteTransaction = async (id: number) => {
-    try {
-      const response = await fetch(`${API_URL}/api/transactions/${id}`, {
-        method: 'DELETE',
-      })
-      
-      if (response.ok) {
-        await fetchData()
-        setDeleteConfirm(null)
-        setSwipedItemId(null)
+    if (!useLocalStorage) {
+      try {
+        const response = await fetch(`${API_URL}/api/transactions/${id}`, {
+          method: 'DELETE',
+        })
+        
+        if (response.ok) {
+          await fetchData()
+          setDeleteConfirm(null)
+          setSwipedItemId(null)
+          return
+        }
+      } catch (error) {
+        console.error('Failed to delete transaction via API, using localStorage:', error)
       }
-    } catch (error) {
-      console.error('Failed to delete transaction:', error)
     }
+    
+    const localTx = loadLocalTransactions()
+    const updatedTx = localTx.filter(tx => tx.id !== id)
+    saveLocalTransactions(updatedTx)
+    setTransactions(sortTransactions(updatedTx))
+    setCurrentBalance(calcBalance(updatedTx))
+    setDeleteConfirm(null)
+    setSwipedItemId(null)
   }
 
   const handleContextMenu = (e: React.MouseEvent, tx: Transaction) => {
