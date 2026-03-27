@@ -35,7 +35,7 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
   const [currentTime, setCurrentTime] = useState<string>('')
   const [showBalanceAfter, setShowBalanceAfter] = useState(false)
-  const [selectedPeriod, setSelectedPeriod] = useState('30days')
+  const [selectedPeriod, setSelectedPeriod] = useState('all')
   const [selectedType, setSelectedType] = useState('all')
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<Transaction | null>(null)
@@ -156,6 +156,9 @@ function App() {
   }, [])
 
   const getDateRange = () => {
+    if (selectedPeriod === 'all') {
+      return '全期間'
+    }
     if (selectedPeriod === 'custom') {
       return `${customStartDate} - ${customEndDate}`
     }
@@ -189,6 +192,15 @@ function App() {
   }
 
   const getFilteredTransactions = () => {
+    if (selectedPeriod === 'all') {
+      return transactions.filter(tx => {
+        if (selectedType === 'all') return true
+        if (selectedType === 'deposit') return tx.amount > 0
+        if (selectedType === 'withdraw') return tx.amount < 0
+        return true
+      })
+    }
+
     const now = new Date()
     const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }))
     let endDate: Date
@@ -658,6 +670,7 @@ function App() {
           <div className="text-sm font-medium text-gray-700 mb-2">表示期間</div>
           <div className="space-y-2">
             {[
+              { id: 'all', label: '全期間' },
               { id: '30days', label: '直近30日間' },
               { id: 'thisMonth', label: '今月' },
               { id: 'lastMonth', label: '前月' },
