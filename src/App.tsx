@@ -14,13 +14,72 @@ interface Transaction {
   amount: number
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const getApiUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL
+  if (envUrl === undefined) return 'http://localhost:8000'
+  if (envUrl === '') return window.location.origin
+  return envUrl
+}
+const API_URL = getApiUrl()
+
+const DEFAULT_TRANSACTIONS: Transaction[] = [
+  { id: 1, date: '3/02', month: 3, day: 2, type: '電話', description: 'ドコモケイタイ', amount: -6860 },
+  { id: 2, date: '2/27', month: 2, day: 27, type: 'カード', description: '', amount: -196000 },
+  { id: 3, date: '2/26', month: 2, day: 26, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 202208 },
+  { id: 4, date: '2/02', month: 2, day: 2, type: '電話', description: 'ドコモケイタイ', amount: -6630 },
+  { id: 5, date: '2/01', month: 2, day: 1, type: 'カード', description: '', amount: -257000 },
+  { id: 6, date: '1/29', month: 1, day: 29, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 263560 },
+  { id: 7, date: '1/05', month: 1, day: 5, type: '電話', description: 'ドコモケイタイ', amount: -6692 },
+  { id: 8, date: '12/29', month: 12, day: 29, type: 'カード', description: '', amount: -434000 },
+  { id: 9, date: '12/25', month: 12, day: 25, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 442507 },
+  { id: 10, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
+  { id: 11, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
+  { id: 12, date: '11/27', month: 11, day: 27, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 231338 },
+  { id: 13, date: '10/31', month: 10, day: 31, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
+  { id: 14, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
+  { id: 15, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
+]
+
+const BASE_BALANCE = -1456
+
+const STORAGE_KEY = 'bank_transactions'
+const DATA_VERSION_KEY = 'bank_data_version'
+const DATA_VERSION = '2026-03-27-v2'
+
+const loadLocalTransactions = (): Transaction[] => {
+  try {
+    const storedVersion = localStorage.getItem(DATA_VERSION_KEY)
+    if (storedVersion !== DATA_VERSION) {
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.setItem(DATA_VERSION_KEY, DATA_VERSION)
+      return DEFAULT_TRANSACTIONS
+    }
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch (e) {
+    console.error('Failed to load from localStorage:', e)
+  }
+  return DEFAULT_TRANSACTIONS
+}
+
+const saveLocalTransactions = (txList: Transaction[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(txList))
+  } catch (e) {
+    console.error('Failed to save to localStorage:', e)
+  }
+}
+
+const calcBalance = (txList: Transaction[]): number => {
+  const adjustment = txList.reduce((sum, tx) => sum + tx.amount, 0)
+  return BASE_BALANCE + adjustment
+}
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
   const [currentTime, setCurrentTime] = useState<string>('')
   const [showBalanceAfter, setShowBalanceAfter] = useState(false)
-  const [selectedPeriod, setSelectedPeriod] = useState('30days')
+  const [selectedPeriod, setSelectedPeriod] = useState('all')
   const [selectedType, setSelectedType] = useState('all')
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<Transaction | null>(null)
@@ -48,8 +107,8 @@ function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [currentBalance, setCurrentBalance] = useState<number>(0)
   
-  const [swipedItemId, setSwipedItemId] = useState<number | null>(null)
-  const [touchStartX, setTouchStartX] = useState<number>(0)
+  const [longPressTimer, setLongPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const [longPressProgress, setLongPressProgress] = useState<{id: number, startTime: number} | null>(null)
   
   const getTypePriority = (type: string): number => {
     if (type === '電話') return 0
@@ -58,16 +117,29 @@ function App() {
     return 3
   }
   
+  const getTransactionDate = (tx: Transaction): Date => {
+    const now = new Date()
+    const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }))
+    const currentYear = japanTime.getFullYear()
+    const currentMonth = japanTime.getMonth() + 1
+    
+    let txYear = currentYear
+    if (tx.month > currentMonth + 1) {
+      txYear = currentYear - 1
+    }
+    return new Date(txYear, tx.month - 1, tx.day)
+  }
+
   const sortTransactions = (txList: Transaction[]): Transaction[] => {
     return [...txList].sort((a, b) => {
-      const aIsNewYear = a.month <= 2
-      const bIsNewYear = b.month <= 2
-      if (aIsNewYear !== bIsNewYear) return aIsNewYear ? -1 : 1
-      if (a.month !== b.month) return b.month - a.month
-      if (a.day !== b.day) return b.day - a.day
+      const dateA = getTransactionDate(a).getTime()
+      const dateB = getTransactionDate(b).getTime()
+      if (dateA !== dateB) return dateB - dateA
       return getTypePriority(a.type) - getTypePriority(b.type)
     })
   }
+
+  const [useLocalStorage, setUseLocalStorage] = useState(false)
 
   const fetchTransactions = useCallback(async () => {
     try {
@@ -75,10 +147,14 @@ function App() {
       if (response.ok) {
         const data = await response.json()
         setTransactions(sortTransactions(data))
+        return
       }
     } catch (error) {
-      console.error('Failed to fetch transactions:', error)
+      console.error('Failed to fetch transactions, using localStorage:', error)
     }
+    setUseLocalStorage(true)
+    const localTx = loadLocalTransactions()
+    setTransactions(sortTransactions(localTx))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -88,10 +164,13 @@ function App() {
       if (response.ok) {
         const data = await response.json()
         setCurrentBalance(data.balance)
+        return
       }
     } catch (error) {
-      console.error('Failed to fetch balance:', error)
+      console.error('Failed to fetch balance, using localStorage:', error)
     }
+    const localTx = loadLocalTransactions()
+    setCurrentBalance(calcBalance(localTx))
   }, [])
 
   const fetchData = useCallback(async () => {
@@ -126,6 +205,9 @@ function App() {
   }, [])
 
   const getDateRange = () => {
+    if (selectedPeriod === 'all') {
+      return '全期間'
+    }
     if (selectedPeriod === 'custom') {
       return `${customStartDate} - ${customEndDate}`
     }
@@ -155,19 +237,19 @@ function App() {
   }
 
   const getTxDate = (tx: Transaction) => {
-    const now = new Date()
-    const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }))
-    const currentYear = japanTime.getFullYear()
-    const currentMonth = japanTime.getMonth() + 1
-    
-    let txYear = currentYear
-    if (tx.month > currentMonth + 1) {
-      txYear = currentYear - 1
-    }
-    return new Date(txYear, tx.month - 1, tx.day)
+    return getTransactionDate(tx)
   }
 
   const getFilteredTransactions = () => {
+    if (selectedPeriod === 'all') {
+      return transactions.filter(tx => {
+        if (selectedType === 'all') return true
+        if (selectedType === 'deposit') return tx.amount > 0
+        if (selectedType === 'withdraw') return tx.amount < 0
+        return true
+      })
+    }
+
     const now = new Date()
     const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }))
     let endDate: Date
@@ -232,68 +314,92 @@ function App() {
       amount: amount
     }
     
-    try {
-      const response = await fetch(`${API_URL}/api/transactions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newTx),
-      })
-      
-      if (response.ok) {
-        await fetchData()
-        setShowAddTransaction(false)
-        setNewTransaction({
-          month: 12,
-          day: 1,
-          type: '振込',
-          description: '',
-          amount: 0,
-          isExpense: false
+    if (!useLocalStorage) {
+      try {
+        const response = await fetch(`${API_URL}/api/transactions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newTx),
         })
+        
+        if (response.ok) {
+          await fetchData()
+          setShowAddTransaction(false)
+          setNewTransaction({
+            month: 12,
+            day: 1,
+            type: '振込',
+            description: '',
+            amount: 0,
+            isExpense: false
+          })
+          return
+        }
+      } catch (error) {
+        console.error('Failed to add transaction via API, using localStorage:', error)
       }
-    } catch (error) {
-      console.error('Failed to add transaction:', error)
     }
+    
+    const localTx = loadLocalTransactions()
+    const maxId = localTx.reduce((max, tx) => Math.max(max, tx.id), 0)
+    const fullTx: Transaction = { ...newTx, id: maxId + 1 }
+    const updatedTx = [...localTx, fullTx]
+    saveLocalTransactions(updatedTx)
+    setTransactions(sortTransactions(updatedTx))
+    setCurrentBalance(calcBalance(updatedTx))
+    setShowAddTransaction(false)
+    setNewTransaction({
+      month: 12,
+      day: 1,
+      type: '振込',
+      description: '',
+      amount: 0,
+      isExpense: false
+    })
   }
 
   const deleteTransaction = async (id: number) => {
-    try {
-      const response = await fetch(`${API_URL}/api/transactions/${id}`, {
-        method: 'DELETE',
-      })
-      
-      if (response.ok) {
-        await fetchData()
-        setDeleteConfirm(null)
-        setSwipedItemId(null)
+    if (!useLocalStorage) {
+      try {
+        const response = await fetch(`${API_URL}/api/transactions/${id}`, {
+          method: 'DELETE',
+        })
+        
+        if (response.ok) {
+          await fetchData()
+          setDeleteConfirm(null)
+          return
+        }
+      } catch (error) {
+        console.error('Failed to delete transaction via API, using localStorage:', error)
       }
-    } catch (error) {
-      console.error('Failed to delete transaction:', error)
     }
+    
+    const localTx = loadLocalTransactions()
+    const updatedTx = localTx.filter(tx => tx.id !== id)
+    saveLocalTransactions(updatedTx)
+    setTransactions(sortTransactions(updatedTx))
+    setCurrentBalance(calcBalance(updatedTx))
+    setDeleteConfirm(null)
   }
 
-  const handleContextMenu = (e: React.MouseEvent, tx: Transaction) => {
-    e.preventDefault()
-    setDeleteConfirm(tx)
+  const handleLongPressStart = (tx: Transaction) => {
+    setLongPressProgress({ id: tx.id, startTime: Date.now() })
+    const timer = setTimeout(() => {
+      setDeleteConfirm(tx)
+      setLongPressProgress(null)
+    }, 10000)
+    setLongPressTimer(timer)
   }
 
-  const handleSwipeTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.touches[0].clientX)
-  }
-
-  const handleSwipeTouchMove = (e: React.TouchEvent, txId: number) => {
-    const touchCurrentX = e.touches[0].clientX
-    const diff = touchCurrentX - touchStartX
-    if (diff > 50) {
-      setSwipedItemId(txId)
-    } else if (diff < -50) {
-      setSwipedItemId(null)
+  const handleLongPressEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
     }
-  }
-
-  const handleSwipeTouchEnd = () => {
+    setLongPressProgress(null)
   }
 
   const HomeScreen = () => (
@@ -524,11 +630,14 @@ function App() {
                 )}
                 <div className="relative overflow-hidden border-b border-gray-100">
                   <div 
-                    className={`px-4 py-4 cursor-pointer hover:bg-gray-50 select-none bg-white transition-transform duration-200 ${swipedItemId === tx.id ? 'translate-x-16' : 'translate-x-0'}`}
-                    onContextMenu={(e) => handleContextMenu(e, tx)}
-                    onTouchStart={(e) => handleSwipeTouchStart(e)}
-                    onTouchMove={(e) => handleSwipeTouchMove(e, tx.id)}
-                    onTouchEnd={handleSwipeTouchEnd}
+                    className="px-4 py-4 cursor-pointer hover:bg-gray-50 select-none bg-white"
+                    onTouchStart={() => handleLongPressStart(tx)}
+                    onTouchEnd={handleLongPressEnd}
+                    onTouchCancel={handleLongPressEnd}
+                    onMouseDown={() => handleLongPressStart(tx)}
+                    onMouseUp={handleLongPressEnd}
+                    onMouseLeave={handleLongPressEnd}
+                    onContextMenu={(e) => e.preventDefault()}
                   >
                     <div className="text-sm text-gray-600">
                       {tx.date.replace(/^(\d+)\//, (_, m) => m.padStart(2, '0') + '/')}{'\u3000'}{tx.type}{tx.description ? `｜${tx.description}` : ''}
@@ -536,13 +645,12 @@ function App() {
                     <div className={`text-right text-lg font-medium mt-1 ${tx.amount < 0 ? 'text-red-500' : 'text-gray-900'}`}>
                       {formatAmount(tx.amount)}<span className="text-sm">円</span>
                     </div>
+                    {longPressProgress && longPressProgress.id === tx.id && (
+                      <div className="mt-1 w-full bg-gray-200 rounded-full h-1.5">
+                        <div className="bg-red-500 h-1.5 rounded-full transition-all duration-[10000ms] ease-linear w-full" style={{animation: 'progressBar 10s linear forwards'}} />
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => deleteTransaction(tx.id)}
-                    className={`absolute left-0 top-0 bottom-0 w-16 bg-red-500 flex items-center justify-center text-white text-2xl font-bold transition-opacity duration-200 ${swipedItemId === tx.id ? 'opacity-100' : 'opacity-0'}`}
-                  >
-                    -
-                  </button>
                 </div>
               </div>
             )
@@ -637,6 +745,7 @@ function App() {
           <div className="text-sm font-medium text-gray-700 mb-2">表示期間</div>
           <div className="space-y-2">
             {[
+              { id: 'all', label: '全期間' },
               { id: '30days', label: '直近30日間' },
               { id: 'thisMonth', label: '今月' },
               { id: 'lastMonth', label: '前月' },
@@ -719,37 +828,39 @@ function App() {
         {showAddTransaction && (
           <div className="mb-4">
             <div className="text-sm font-medium text-gray-700 mb-2">取引明細を追加</div>
-            <div className="mt-3 bg-white rounded-lg p-4 border border-gray-200 space-y-3">
-              <div className="flex gap-2">
+            <div className="mt-3 bg-white rounded-lg p-4 border border-gray-200 space-y-4">
+              <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="text-xs text-gray-500">月</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="12"
+                  <label className="text-sm text-gray-600 mb-1 block">月</label>
+                  <select
                     value={newTransaction.month}
-                    onChange={(e) => setNewTransaction({...newTransaction, month: parseInt(e.target.value) || 1})}
-                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                  />
+                    onChange={(e) => setNewTransaction({...newTransaction, month: parseInt(e.target.value)})}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base appearance-none bg-white"
+                  >
+                    {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                      <option key={m} value={m}>{m}月</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex-1">
-                  <label className="text-xs text-gray-500">日</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
+                  <label className="text-sm text-gray-600 mb-1 block">日</label>
+                  <select
                     value={newTransaction.day}
-                    onChange={(e) => setNewTransaction({...newTransaction, day: parseInt(e.target.value) || 1})}
-                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                  />
+                    onChange={(e) => setNewTransaction({...newTransaction, day: parseInt(e.target.value)})}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base appearance-none bg-white"
+                  >
+                    {Array.from({length: 31}, (_, i) => i + 1).map(d => (
+                      <option key={d} value={d}>{d}日</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-500">取引種別</label>
+                <label className="text-sm text-gray-600 mb-1 block">取引種別</label>
                 <select
                   value={newTransaction.type}
                   onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value})}
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base appearance-none bg-white"
                 >
                   <option value="振込">振込</option>
                   <option value="振込2">振込2</option>
@@ -759,37 +870,44 @@ function App() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500">摘要</label>
+                <label className="text-sm text-gray-600 mb-1 block">摘要</label>
                 <input
                   type="text"
                   value={newTransaction.description}
                   onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base"
                   placeholder="例: カ）エヌイーエフコミュニケーシ"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">金額</label>
+                <label className="text-sm text-gray-600 mb-1 block">金額</label>
                 <input
-                  type="number"
-                  value={newTransaction.amount}
-                  onChange={(e) => setNewTransaction({...newTransaction, amount: parseInt(e.target.value) || 0})}
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={newTransaction.amount || ''}
+                  onChange={(e) => setNewTransaction({...newTransaction, amount: parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base"
+                  placeholder="0"
                 />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isExpense"
-                  checked={newTransaction.isExpense}
-                  onChange={(e) => setNewTransaction({...newTransaction, isExpense: e.target.checked})}
-                  className="w-4 h-4"
-                />
-                <label htmlFor="isExpense" className="text-sm">出金（マイナス表示）</label>
               </div>
               <button
+                type="button"
+                onClick={() => setNewTransaction({...newTransaction, isExpense: !newTransaction.isExpense})}
+                className={`w-full flex items-center justify-between px-4 py-4 rounded-lg border-2 transition-colors ${
+                  newTransaction.isExpense ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'
+                }`}
+              >
+                <span className="text-base font-medium">{newTransaction.isExpense ? '出金（マイナス表示）' : '入金（プラス表示）'}</span>
+                <div className={`w-12 h-7 rounded-full transition-colors flex items-center ${
+                  newTransaction.isExpense ? 'bg-red-500 justify-end' : 'bg-gray-300 justify-start'
+                }`}>
+                  <div className="w-6 h-6 bg-white rounded-full shadow mx-0.5" />
+                </div>
+              </button>
+              <button
                 onClick={addTransaction}
-                className="w-full bg-red-500 text-white py-2 rounded-lg text-sm font-medium"
+                className="w-full bg-red-500 text-white py-4 rounded-lg text-base font-medium active:bg-red-600"
               >
                 追加する
               </button>

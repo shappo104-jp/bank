@@ -1,9 +1,12 @@
 import os
 import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -49,6 +52,12 @@ def init_db():
         count = cursor.fetchone()[0]
         if count == 0:
             default_transactions = [
+                ('3/02', 3, 2, '電話', 'ドコモケイタイ', -6860),
+                ('2/27', 2, 27, 'カード', '', -196000),
+                ('2/26', 2, 26, '振込2', 'カ）エヌイーエフコミュニケーシ', 202208),
+                ('2/02', 2, 2, '電話', 'ドコモケイタイ', -6630),
+                ('2/01', 2, 1, 'カード', '', -257000),
+                ('1/29', 1, 29, '振込2', 'カ）エヌイーエフコミュニケーシ', 263560),
                 ('1/05', 1, 5, '電話', 'ドコモケイタイ', -6692),
                 ('12/29', 12, 29, 'カード', '', -434000),
                 ('12/25', 12, 25, '振込2', 'カ）エヌイーエフコミュニケーシ', 442507),
@@ -94,7 +103,7 @@ class BalanceResponse(BaseModel):
     adjustment: int
 
 
-BASE_BALANCE = 448772
+BASE_BALANCE = -1456
 
 
 @app.get("/healthz")
@@ -149,7 +158,7 @@ async def get_balance():
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT SUM(amount) as total FROM transactions WHERE month = 1 OR month = 2 OR (month = 12 AND day >= 29)"
+            "SELECT SUM(amount) as total FROM transactions"
         )
         row = cursor.fetchone()
         adjustment = row["total"] if row["total"] is not None else 0
@@ -158,3 +167,20 @@ async def get_balance():
             "base_balance": BASE_BALANCE,
             "adjustment": adjustment
         }
+
+
+# Serve frontend static files
+STATIC_DIR = Path(__file__).parent.parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
+
+    @app.get("/")
+    async def serve_index():
+        return FileResponse(str(STATIC_DIR / "index.html"))
+
+    @app.get("/{path:path}")
+    async def serve_spa(path: str):
+        file_path = STATIC_DIR / path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(STATIC_DIR / "index.html"))

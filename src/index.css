@@ -1,6 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes progressBar {
+  from { width: 0%; }
+  to { width: 100%; }
+}
 @layer base {
   :root {
     --radius: 0.5rem
