@@ -58,13 +58,24 @@ function App() {
     return 3
   }
   
+  const getTransactionDate = (tx: Transaction): Date => {
+    const now = new Date()
+    const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }))
+    const currentYear = japanTime.getFullYear()
+    const currentMonth = japanTime.getMonth() + 1
+    
+    let txYear = currentYear
+    if (tx.month > currentMonth + 1) {
+      txYear = currentYear - 1
+    }
+    return new Date(txYear, tx.month - 1, tx.day)
+  }
+
   const sortTransactions = (txList: Transaction[]): Transaction[] => {
     return [...txList].sort((a, b) => {
-      const aIsNewYear = a.month <= 2
-      const bIsNewYear = b.month <= 2
-      if (aIsNewYear !== bIsNewYear) return aIsNewYear ? -1 : 1
-      if (a.month !== b.month) return b.month - a.month
-      if (a.day !== b.day) return b.day - a.day
+      const dateA = getTransactionDate(a).getTime()
+      const dateB = getTransactionDate(b).getTime()
+      if (dateA !== dateB) return dateB - dateA
       return getTypePriority(a.type) - getTypePriority(b.type)
     })
   }
@@ -155,16 +166,7 @@ function App() {
   }
 
   const getTxDate = (tx: Transaction) => {
-    const now = new Date()
-    const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }))
-    const currentYear = japanTime.getFullYear()
-    const currentMonth = japanTime.getMonth() + 1
-    
-    let txYear = currentYear
-    if (tx.month > currentMonth + 1) {
-      txYear = currentYear - 1
-    }
-    return new Date(txYear, tx.month - 1, tx.day)
+    return getTransactionDate(tx)
   }
 
   const getFilteredTransactions = () => {
@@ -719,37 +721,39 @@ function App() {
         {showAddTransaction && (
           <div className="mb-4">
             <div className="text-sm font-medium text-gray-700 mb-2">取引明細を追加</div>
-            <div className="mt-3 bg-white rounded-lg p-4 border border-gray-200 space-y-3">
-              <div className="flex gap-2">
+            <div className="mt-3 bg-white rounded-lg p-4 border border-gray-200 space-y-4">
+              <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="text-xs text-gray-500">月</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="12"
+                  <label className="text-sm text-gray-600 mb-1 block">月</label>
+                  <select
                     value={newTransaction.month}
-                    onChange={(e) => setNewTransaction({...newTransaction, month: parseInt(e.target.value) || 1})}
-                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                  />
+                    onChange={(e) => setNewTransaction({...newTransaction, month: parseInt(e.target.value)})}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base appearance-none bg-white"
+                  >
+                    {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                      <option key={m} value={m}>{m}月</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex-1">
-                  <label className="text-xs text-gray-500">日</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
+                  <label className="text-sm text-gray-600 mb-1 block">日</label>
+                  <select
                     value={newTransaction.day}
-                    onChange={(e) => setNewTransaction({...newTransaction, day: parseInt(e.target.value) || 1})}
-                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                  />
+                    onChange={(e) => setNewTransaction({...newTransaction, day: parseInt(e.target.value)})}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base appearance-none bg-white"
+                  >
+                    {Array.from({length: 31}, (_, i) => i + 1).map(d => (
+                      <option key={d} value={d}>{d}日</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-500">取引種別</label>
+                <label className="text-sm text-gray-600 mb-1 block">取引種別</label>
                 <select
                   value={newTransaction.type}
                   onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value})}
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base appearance-none bg-white"
                 >
                   <option value="振込">振込</option>
                   <option value="振込2">振込2</option>
@@ -759,37 +763,44 @@ function App() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500">摘要</label>
+                <label className="text-sm text-gray-600 mb-1 block">摘要</label>
                 <input
                   type="text"
                   value={newTransaction.description}
                   onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base"
                   placeholder="例: カ）エヌイーエフコミュニケーシ"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">金額</label>
+                <label className="text-sm text-gray-600 mb-1 block">金額</label>
                 <input
-                  type="number"
-                  value={newTransaction.amount}
-                  onChange={(e) => setNewTransaction({...newTransaction, amount: parseInt(e.target.value) || 0})}
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={newTransaction.amount || ''}
+                  onChange={(e) => setNewTransaction({...newTransaction, amount: parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base"
+                  placeholder="0"
                 />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isExpense"
-                  checked={newTransaction.isExpense}
-                  onChange={(e) => setNewTransaction({...newTransaction, isExpense: e.target.checked})}
-                  className="w-4 h-4"
-                />
-                <label htmlFor="isExpense" className="text-sm">出金（マイナス表示）</label>
               </div>
               <button
+                type="button"
+                onClick={() => setNewTransaction({...newTransaction, isExpense: !newTransaction.isExpense})}
+                className={`w-full flex items-center justify-between px-4 py-4 rounded-lg border-2 transition-colors ${
+                  newTransaction.isExpense ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'
+                }`}
+              >
+                <span className="text-base font-medium">{newTransaction.isExpense ? '出金（マイナス表示）' : '入金（プラス表示）'}</span>
+                <div className={`w-12 h-7 rounded-full transition-colors flex items-center ${
+                  newTransaction.isExpense ? 'bg-red-500 justify-end' : 'bg-gray-300 justify-start'
+                }`}>
+                  <div className="w-6 h-6 bg-white rounded-full shadow mx-0.5" />
+                </div>
+              </button>
+              <button
                 onClick={addTransaction}
-                className="w-full bg-red-500 text-white py-2 rounded-lg text-sm font-medium"
+                className="w-full bg-red-500 text-white py-4 rounded-lg text-base font-medium active:bg-red-600"
               >
                 追加する
               </button>
