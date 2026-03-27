@@ -14,24 +14,22 @@ interface Transaction {
   amount: number
 }
 
-const RAW_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
-const parseApiUrl = (rawUrl: string): { url: string; headers: Record<string, string> } => {
-  try {
-    const url = new URL(rawUrl)
-    if (url.username || url.password) {
-      const credentials = btoa(`${url.username}:${url.password}`)
-      url.username = ''
-      url.password = ''
-      return { url: url.origin, headers: { 'Authorization': `Basic ${credentials}` } }
-    }
-    return { url: url.origin, headers: {} }
-  } catch {
-    return { url: rawUrl, headers: {} }
-  }
-}
+const DEFAULT_TRANSACTIONS: Transaction[] = [
+  { id: 1, date: '1/05', month: 1, day: 5, type: '電話', description: 'ドコモケイタイ', amount: -6692 },
+  { id: 2, date: '12/29', month: 12, day: 29, type: 'カード', description: '', amount: -434000 },
+  { id: 3, date: '12/25', month: 12, day: 25, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 442507 },
+  { id: 4, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
+  { id: 5, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
+  { id: 6, date: '11/27', month: 11, day: 27, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 231338 },
+  { id: 7, date: '10/31', month: 10, day: 31, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
+  { id: 8, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
+  { id: 9, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
+]
 
-const { url: API_URL, headers: API_HEADERS } = parseApiUrl(RAW_API_URL)
+const BASE_BALANCE = 448772
+const DEFAULT_ADJUSTMENT = -440692
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
@@ -99,27 +97,31 @@ function App() {
 
   const fetchTransactions = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/api/transactions`, { headers: API_HEADERS })
+      const response = await fetch(`${API_URL}/api/transactions`)
       if (response.ok) {
         const data = await response.json()
         setTransactions(sortTransactions(data))
+        return
       }
     } catch (error) {
-      console.error('Failed to fetch transactions:', error)
+      console.error('Failed to fetch transactions, using defaults:', error)
     }
+    setTransactions(sortTransactions(DEFAULT_TRANSACTIONS))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchBalance = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/api/balance`, { headers: API_HEADERS })
+      const response = await fetch(`${API_URL}/api/balance`)
       if (response.ok) {
         const data = await response.json()
         setCurrentBalance(data.balance)
+        return
       }
     } catch (error) {
-      console.error('Failed to fetch balance:', error)
+      console.error('Failed to fetch balance, using defaults:', error)
     }
+    setCurrentBalance(BASE_BALANCE + DEFAULT_ADJUSTMENT)
   }, [])
 
   const fetchData = useCallback(async () => {
@@ -255,7 +257,6 @@ function App() {
       const response = await fetch(`${API_URL}/api/transactions`, {
         method: 'POST',
         headers: {
-          ...API_HEADERS,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(newTx),
@@ -282,7 +283,6 @@ function App() {
     try {
       const response = await fetch(`${API_URL}/api/transactions/${id}`, {
         method: 'DELETE',
-        headers: API_HEADERS,
       })
       
       if (response.ok) {
