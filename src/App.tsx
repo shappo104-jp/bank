@@ -14,7 +14,24 @@ interface Transaction {
   amount: number
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const RAW_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+const parseApiUrl = (rawUrl: string): { url: string; headers: Record<string, string> } => {
+  try {
+    const url = new URL(rawUrl)
+    if (url.username || url.password) {
+      const credentials = btoa(`${url.username}:${url.password}`)
+      url.username = ''
+      url.password = ''
+      return { url: url.origin, headers: { 'Authorization': `Basic ${credentials}` } }
+    }
+    return { url: url.origin, headers: {} }
+  } catch {
+    return { url: rawUrl, headers: {} }
+  }
+}
+
+const { url: API_URL, headers: API_HEADERS } = parseApiUrl(RAW_API_URL)
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
@@ -82,7 +99,7 @@ function App() {
 
   const fetchTransactions = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/api/transactions`)
+      const response = await fetch(`${API_URL}/api/transactions`, { headers: API_HEADERS })
       if (response.ok) {
         const data = await response.json()
         setTransactions(sortTransactions(data))
@@ -95,7 +112,7 @@ function App() {
 
   const fetchBalance = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/api/balance`)
+      const response = await fetch(`${API_URL}/api/balance`, { headers: API_HEADERS })
       if (response.ok) {
         const data = await response.json()
         setCurrentBalance(data.balance)
@@ -238,6 +255,7 @@ function App() {
       const response = await fetch(`${API_URL}/api/transactions`, {
         method: 'POST',
         headers: {
+          ...API_HEADERS,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(newTx),
@@ -264,6 +282,7 @@ function App() {
     try {
       const response = await fetch(`${API_URL}/api/transactions/${id}`, {
         method: 'DELETE',
+        headers: API_HEADERS,
       })
       
       if (response.ok) {
