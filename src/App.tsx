@@ -34,7 +34,7 @@ const DEFAULT_TRANSACTIONS: Transaction[] = [
   { id: 9, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
 ]
 
-const BASE_BALANCE = 448772
+const BASE_BALANCE = 4682
 
 const STORAGE_KEY = 'bank_transactions'
 

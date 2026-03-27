@@ -97,7 +97,7 @@ class BalanceResponse(BaseModel):
     adjustment: int
 
 
-BASE_BALANCE = 448772
+BASE_BALANCE = 4682
 
 
 @app.get("/healthz")
