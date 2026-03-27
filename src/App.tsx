@@ -23,23 +23,37 @@ const getApiUrl = (): string => {
 const API_URL = getApiUrl()
 
 const DEFAULT_TRANSACTIONS: Transaction[] = [
-  { id: 1, date: '1/05', month: 1, day: 5, type: '電話', description: 'ドコモケイタイ', amount: -6692 },
-  { id: 2, date: '12/29', month: 12, day: 29, type: 'カード', description: '', amount: -434000 },
-  { id: 3, date: '12/25', month: 12, day: 25, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 442507 },
-  { id: 4, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
-  { id: 5, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
-  { id: 6, date: '11/27', month: 11, day: 27, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 231338 },
-  { id: 7, date: '10/31', month: 10, day: 31, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
-  { id: 8, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
-  { id: 9, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
+  { id: 1, date: '3/02', month: 3, day: 2, type: '電話', description: 'ドコモケイタイ', amount: -6860 },
+  { id: 2, date: '2/27', month: 2, day: 27, type: 'カード', description: '', amount: -196000 },
+  { id: 3, date: '2/26', month: 2, day: 26, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 202208 },
+  { id: 4, date: '2/02', month: 2, day: 2, type: '電話', description: 'ドコモケイタイ', amount: -6630 },
+  { id: 5, date: '2/01', month: 2, day: 1, type: 'カード', description: '', amount: -257000 },
+  { id: 6, date: '1/29', month: 1, day: 29, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 263560 },
+  { id: 7, date: '1/05', month: 1, day: 5, type: '電話', description: 'ドコモケイタイ', amount: -6692 },
+  { id: 8, date: '12/29', month: 12, day: 29, type: 'カード', description: '', amount: -434000 },
+  { id: 9, date: '12/25', month: 12, day: 25, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 442507 },
+  { id: 10, date: '12/01', month: 12, day: 1, type: '電話', description: 'ドコモケイタイ', amount: -6883 },
+  { id: 11, date: '11/28', month: 11, day: 28, type: 'カード', description: '', amount: -216000 },
+  { id: 12, date: '11/27', month: 11, day: 27, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 231338 },
+  { id: 13, date: '10/31', month: 10, day: 31, type: '電話', description: 'ドコモケイタイ', amount: -6863 },
+  { id: 14, date: '10/30', month: 10, day: 30, type: 'カード', description: '', amount: -183000 },
+  { id: 15, date: '10/30', month: 10, day: 30, type: '振込2', description: 'カ）エヌイーエフコミュニケーシ', amount: 189129 },
 ]
 
-const BASE_BALANCE = 4682
+const BASE_BALANCE = -1456
 
 const STORAGE_KEY = 'bank_transactions'
+const DATA_VERSION_KEY = 'bank_data_version'
+const DATA_VERSION = '2026-03-27-v2'
 
 const loadLocalTransactions = (): Transaction[] => {
   try {
+    const storedVersion = localStorage.getItem(DATA_VERSION_KEY)
+    if (storedVersion !== DATA_VERSION) {
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.setItem(DATA_VERSION_KEY, DATA_VERSION)
+      return DEFAULT_TRANSACTIONS
+    }
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) return JSON.parse(stored)
   } catch (e) {
